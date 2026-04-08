@@ -274,6 +274,70 @@ export default function SettingsPage() {
             let collectionName = '';
             let payload: any = {};
 
+            // ── Fix #1: Duplicate Entry Trapping (Global — across ALL categories) ──
+            if (modalType === 'category' && !editingId) {
+                const dupName = categoryForm.name.trim().toLowerCase();
+                const conflictCat = categories.find(c => c.name.trim().toLowerCase() === dupName);
+                if (conflictCat) {
+                    alert(`⚠️ Duplicate Category: "${categoryForm.name.trim()}" already exists.\nPlease choose a different category name.`);
+                    setSaving(false);
+                    return;
+                }
+            }
+
+            if (modalType === 'service' && !editingId) {
+                const newServiceName = serviceForm.name.trim().toLowerCase();
+
+                // Check against ALL locally loaded services (across all categories)
+                const localConflict = services.find(s => s.name.trim().toLowerCase() === newServiceName);
+                if (localConflict) {
+                    // Resolve category name - check categoryId first, then fall back to categoryName
+                    const conflictCatName = categories.find(c => c.id === localConflict.categoryId)?.name
+                        || localConflict.categoryName
+                        || 'another category';
+                    alert(
+                        `⚠️ Duplicate Service: "${serviceForm.name.trim()}" already exists under "${conflictCatName}".\n\nService names must be unique across ALL categories.\nPlease use a different name.`
+                    );
+                    setSaving(false);
+                    return;
+                }
+
+                // Also do a live Firestore check in case the page state is stale
+                try {
+                    const { getDocs: _getDocs, collection: _collection, query: _query, where: _where } = await import('firebase/firestore');
+                    const liveSnap = await _getDocs(_collection(db, 'services'));
+                    const liveConflict = liveSnap.docs.find(
+                        d => (d.data().name || '').trim().toLowerCase() === newServiceName
+                    );
+                    if (liveConflict) {
+                        const liveData = liveConflict.data();
+                        const liveCatName = categories.find(c => c.id === liveData.categoryId)?.name
+                            || liveData.category
+                            || liveData.categoryName
+                            || 'another category';
+                        alert(
+                            `⚠️ Duplicate Service: "${serviceForm.name.trim()}" already exists under "${liveCatName}".\n\nService names must be unique across ALL categories.\nPlease use a different name.`
+                        );
+                        setSaving(false);
+                        return;
+                    }
+                } catch (checkErr) {
+                    console.warn('Live duplicate check failed (non-fatal):', checkErr);
+                    // If the live check fails, we already passed the local check above, so continue.
+                }
+            }
+
+            if (modalType === 'admin' && !editingId) {
+                const dupEmail = adminForm.email.trim().toLowerCase();
+                const exists = admins.some(a => a.email?.trim().toLowerCase() === dupEmail);
+                if (exists) {
+                    alert(`⚠️ Duplicate Admin: An account with email "${adminForm.email.trim()}" already exists.`);
+                    setSaving(false);
+                    return;
+                }
+            }
+            // ─────────────────────────────────────────────────────────────────
+
             let imageUrl = '';
             if (selectedFile) {
                 const path = modalType === 'admin' ? 'admin_photos' :

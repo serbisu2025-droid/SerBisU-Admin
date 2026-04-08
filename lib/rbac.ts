@@ -36,6 +36,7 @@ export const ROLES: Record<UserRole, RoleConfig> = {
             '/users',
             '/skilled-workers',
             '/view-workers',
+            '/bookings',
             '/analytics',
             '/settings',
             '/sms',
@@ -49,11 +50,13 @@ export const ROLES: Record<UserRole, RoleConfig> = {
         permissions: [
             { resource: 'skilled_workers', actions: ['read', 'verify', 'reject'] },
             { resource: 'analytics', actions: ['read'] },
+            { resource: 'bookings', actions: ['read'] },
         ],
         dashboardAccess: [
             '/dashboard',
             '/skilled-workers',
             '/view-workers',
+            '/bookings',
             '/analytics'
         ]
     }

@@ -221,7 +221,7 @@ export default function LoginPage() {
                     </div>
 
                     <div className="mt-10 pt-8 border-t border-border flex items-center justify-center gap-6">
-                        <span className="text-xs text-text-light">© 2024 SerBisU Team</span>
+                        <span className="text-xs text-text-light">© 2026SerBisU Team</span>
                         <div className="w-1.5 h-1.5 rounded-full bg-border"></div>
                         <a href="#" className="text-xs text-text-light hover:text-primary transition-colors">Help Center</a>
                     </div>

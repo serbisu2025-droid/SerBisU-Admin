@@ -33,6 +33,16 @@ function cn(...inputs: ClassValue[]) {
     return twMerge(clsx(inputs));
 }
 
+// Fix #8: Normalize names to title case
+function toTitleCase(str?: string): string {
+    if (!str) return '';
+    return str
+        .toLowerCase()
+        .split(' ')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
+}
+
 interface SkilledWorker {
     id: string;
     fullName: string;
@@ -148,7 +158,7 @@ export default function ViewWorkersPage() {
 
                     return {
                         id: doc.id,
-                        fullName: data.personalInfo?.fullName || data.fullName || 'Unknown',
+                        fullName: toTitleCase(data.personalInfo?.fullName || data.fullName || 'Unknown'),
                         email: data.personalInfo?.email || data.email || 'N/A',
                         phoneNumber: data.personalInfo?.mobileNumber || data.personalInfo?.phoneNumber || data.phone || data.phoneNumber || 'N/A',
                         age: data.personalInfo?.age || data.age || 'N/A',
@@ -354,12 +364,11 @@ export default function ViewWorkersPage() {
                             <AlertCircle className="w-7 h-7" />
                         </div>
                         <div>
-                            <p className="text-[10px] font-black uppercase text-text-light/50 tracking-widest">Inactive Nodes</p>
+                            <p className="text-[10px] font-black uppercase text-text-light/50 tracking-widest">Inactive</p>
                             <h3 className="text-2xl font-black text-text">{workers.filter(w => w.activityStatus === 'inactive').length}</h3>
                         </div>
                     </div>
                 </div>
-
                 {/* Main Table */}
                 <div className="bg-white rounded-[2rem] shadow-xl shadow-primary/5 border border-border/50 overflow-hidden">
                     <div className="overflow-x-auto">

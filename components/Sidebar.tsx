@@ -29,6 +29,7 @@ const Sidebar = () => {
         { title: "Homeowners", icon: <Users className="w-5 h-5" />, path: "/users" },
         { title: user?.role === 'super_admin' ? "Verification" : "PESO Verification", icon: <ShieldCheck className="w-5 h-5" />, path: "/skilled-workers" },
         { title: "Skilled Workers", icon: <Toolbox className="w-5 h-5" />, path: "/view-workers" },
+        { title: "Bookings", icon: <ClipboardList className="w-5 h-5" />, path: "/bookings" },
         { title: "Logs", icon: <ClipboardList className="w-5 h-5" />, path: "/logs" },
         { title: "Analytics", icon: <ChartLine className="w-5 h-5" />, path: "/analytics" },
         { title: "SMS Announcements", icon: <MessageSquare className="w-5 h-5" />, path: "/sms" },
@@ -96,7 +97,7 @@ const Sidebar = () => {
                     <LogOut className="w-5 h-5" />
                     <span className="font-medium">Logout</span>
                 </button>
-                <p className="text-center text-xs text-white/40 mt-4">© 2024 SerBisU</p>
+                <p className="text-center text-xs text-white/40 mt-4">© 2026 SerBisU</p>
             </div>
         </aside>
     );

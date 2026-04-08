@@ -4,6 +4,12 @@
 import { useEffect, useState, useMemo } from "react";
 import { db } from "@/lib/firebase";
 import { collection, onSnapshot, query, orderBy, Timestamp, deleteDoc, doc } from "firebase/firestore";
+
+// Fix #8: Normalize names to title case
+function toTitleCase(str?: string): string {
+    if (!str) return '';
+    return str.toLowerCase().split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+}
 import {
     Search,
     Trash2,
@@ -284,7 +290,7 @@ export default function UsersPage() {
                                                 </div>
                                                 <div>
                                                     <p className="text-sm font-black text-text uppercase tracking-tighter group-hover:text-primary transition-colors">
-                                                        {user.firstName} {user.lastName}
+                                                        {toTitleCase(user.firstName)} {toTitleCase(user.lastName)}
                                                     </p>
                                                 </div>
                                             </div>

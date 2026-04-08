@@ -1,9 +1,10 @@
 "use client";
 
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { db } from "@/lib/firebase";
-import { collection, getDocs, doc, updateDoc, serverTimestamp, query, where, orderBy, addDoc } from "firebase/firestore";
+import { collection, getDocs, doc, updateDoc, serverTimestamp, query, where, orderBy, addDoc, onSnapshot } from "firebase/firestore";
 import {
     Search,
     Mail,
@@ -31,7 +32,9 @@ import {
     ArrowDown,
     Undo2,
     AlertCircle,
-    Monitor
+    Monitor,
+    Flag,
+    AlertTriangle
 } from "lucide-react";
 import Image from "next/image";
 import { clsx, type ClassValue } from "clsx";
@@ -41,6 +44,16 @@ import { hasPermission } from "@/lib/rbac";
 
 function cn(...inputs: ClassValue[]) {
     return twMerge(clsx(inputs));
+}
+
+// Fix #8: Utility to normalize names into Title Case
+function toTitleCase(str?: string): string {
+    if (!str) return '';
+    return str
+        .toLowerCase()
+        .split(' ')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
 }
 
 interface Service {
@@ -137,6 +150,14 @@ interface SkilledWorker {
 }
 
 export default function SkilledWorkersPage() {
+    return (
+        <Suspense fallback={<div className="p-10 text-center">Loading verification portal...</div>}>
+            <SkilledWorkersContent />
+        </Suspense>
+    );
+}
+
+function SkilledWorkersContent() {
     const [workers, setWorkers] = useState<SkilledWorker[]>([]);
     const [filteredWorkers, setFilteredWorkers] = useState<SkilledWorker[]>([]);
     const [services, setServices] = useState<Service[]>([]);
@@ -145,6 +166,21 @@ export default function SkilledWorkersPage() {
     const [selectedWorker, setSelectedWorker] = useState<SkilledWorker | null>(null);
     const [showModal, setShowModal] = useState(false);
     const { user } = useAuth();
+    const searchParams = useSearchParams();
+
+    // Fix: Deep linking for notifications
+    useEffect(() => {
+        if (!loading && workers.length > 0) {
+            const workerId = searchParams.get('workerId');
+            if (workerId) {
+                const target = workers.find(w => w.id === workerId);
+                if (target) {
+                    setSelectedWorker(target);
+                    setShowModal(true);
+                }
+            }
+        }
+    }, [loading, workers, searchParams]);
 
     // Filters
     const [filters, setFilters] = useState({
@@ -155,28 +191,34 @@ export default function SkilledWorkersPage() {
     });
     const [adminNames, setAdminNames] = useState<Record<string, string>>({});
 
-    const fetchWorkerData = async () => {
+    // Fix #4: Real-time listener for skilled workers (no refresh needed)
+    useEffect(() => {
         setLoading(true);
-        try {
-            // Fetch Admins
-            const adminsSnap = await getDocs(collection(db, "admins"));
-            const adminsData: Record<string, string> = {};
-            adminsSnap.docs.forEach(doc => {
-                adminsData[doc.id] = doc.data().fullName || "Unknown Admin";
-            });
-            setAdminNames(adminsData);
 
-            // Fetch Services for filters
-            const servicesSnap = await getDocs(collection(db, "services"));
-            const servicesData = servicesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Service[];
-            setServices(servicesData);
+        // Fetch services and admins first (one-time)
+        const fetchMeta = async () => {
+            try {
+                const adminsSnap = await getDocs(collection(db, "admins"));
+                const adminsData: Record<string, string> = {};
+                adminsSnap.docs.forEach(doc => {
+                    adminsData[doc.id] = doc.data().fullName || "Unknown Admin";
+                });
+                setAdminNames(adminsData);
 
-            // Fetch Workers
-            const workersSnap = await getDocs(collection(db, "skilled_workers"));
-            const workersData = workersSnap.docs.map(doc => {
+                const servicesSnap = await getDocs(collection(db, "services"));
+                const servicesData = servicesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Service[];
+                setServices(servicesData);
+            } catch (error) {
+                console.error("Error fetching admins/services:", error);
+            }
+        };
+        fetchMeta();
+
+        // Real-time listener for workers
+        const unsubWorkers = onSnapshot(collection(db, "skilled_workers"), (snapshot) => {
+            const workersData = snapshot.docs.map(doc => {
                 const data = doc.data();
 
-                // Determine activity status logic from original
                 let activityStatus = 'inactive';
                 const now = new Date();
                 const lastSeen = data.lastSeen ? data.lastSeen.toDate() : null;
@@ -188,20 +230,20 @@ export default function SkilledWorkersPage() {
                     if (daysSinceLastSeen >= 7) activityStatus = 'inactive';
                     else if (minutesSinceLastSeen <= 5) activityStatus = 'active';
                     else if (data.isOnline === true) activityStatus = 'active';
-                    else activityStatus = 'active'; // Original logic had 'active' for < 7 days
+                    else activityStatus = 'active';
                 } else {
                     activityStatus = data.isOnline ? 'active' : 'offline';
                 }
 
-                // Document URL exhaustive fallbacks for any registration version
                 const docs = data.verificationDocuments || data.documents || data.personalInfo || data.verificationData || {};
 
                 return {
                     id: doc.id,
                     ...data,
                     activityStatus,
+                    // Fix #8: Normalize names to title case
                     profileImage: data.profileImage || docs.profileImage || data.profileImageUrl || docs.profileImageUrl || data.personalInfo?.profileImage || data.personalInfo?.profileImageUrl,
-                    fullName: data.personalInfo?.fullName || data.fullName || 'Unknown',
+                    fullName: toTitleCase(data.personalInfo?.fullName || data.fullName || 'Unknown'),
                     email: data.personalInfo?.email || data.email || 'N/A',
                     phoneNumber: data.personalInfo?.mobileNumber || data.personalInfo?.phoneNumber || data.phone || data.phoneNumber || 'N/A',
                     serviceType: data.serviceInfo?.serviceType || data.serviceType || 'General',
@@ -213,50 +255,28 @@ export default function SkilledWorkersPage() {
                     gender: data.personalInfo?.gender || data.gender || 'N/A',
                     experience: data.serviceInfo?.experience || data.experience || 'N/A',
                     address: data.personalInfo?.address || data.location?.address || data.address || 'Unknown',
-
-                    // Exhaustive fallbacks for document URLs (ID FRONT)
                     idFrontPath: data.idFrontPath || docs.idFrontPath || docs.idFront || data.idFront || data.id_front || docs.id_front || docs.idFrontImage || data.idFrontImage,
-
-                    // Exhaustive fallbacks for document URLs (ID BACK)
                     idBackPath: data.idBackPath || docs.idBackPath || docs.idBack || data.idBack || data.id_back || docs.id_back || docs.idBackImage || data.idBackImage,
-
-                    // Exhaustive fallbacks for document URLs (FACE SCAN)
                     faceScanPath: data.faceScanPath || docs.faceScanPath || docs.faceScan || data.faceScan || data.face_scan || docs.face_scan || docs.selfieUrl || data.selfieUrl || data.faceImage || docs.faceImage,
-
-                    // Exhaustive fallbacks for document URLs (BRGY CLEARANCE)
                     brgyClearancePath: data.brgyClearancePath || docs.brgyClearancePath || data.brgyClearanceUrl || docs.brgyClearanceUrl || docs.brgyClearance || data.brgyClearance || data.brgy_clearance || docs.brgy_clearance || data.barangayClearance || docs.barangayClearance,
-
-                    // Exhaustive fallbacks for document URLs (RESUME)
                     resumePath: data.resumePath || docs.resumePath || data.resumeUrl || docs.resumeUrl || docs.resume || data.resume || data.biodata || docs.biodata,
-
-                    // Exhaustive fallbacks for document URLs (TESDA CERT)
                     tesdaCertPath: data.tesdaCertPath || docs.tesdaCertPath || data.tesdaUrl || docs.tesdaUrl || data.tesdaCertUrl || docs.tesdaCertUrl || docs.tesda || data.tesda || data.tesda_cert || docs.tesda_cert,
-
-                    // Exhaustive fallbacks for document URLs (BUSINESS PERMIT)
                     businessPermitPath: data.businessPermitPath || docs.businessPermitPath || data.businessPermitUrl || docs.businessPermitUrl || docs.businessPermit || data.businessPermit || data.business_permit || docs.business_permit || data.permitUrl || docs.permitUrl,
-
-                    // Exhaustive fallbacks for document URLs (SECT REGISTRATION)
                     sectRegistrationPath: data.sectRegistrationPath || docs.sectRegistrationPath || data.sectRegistrationUrl || docs.sectRegistrationUrl || docs.sectRegistration || data.sectRegistration || data.sect_registration || docs.sect_registration || data.dtiUrl || docs.dtiUrl || data.secUrl || docs.secUrl,
-
-                    // Price and Service Pricing
                     servicePricing: data.servicePricing || {},
                     priceRate: data.priceRate || {},
-
-                    // Proof of Work
                     proofOfWorkPaths: data.proofOfWorkPaths || docs.proofOfWorkPaths || data.proofOfWorkUrls || docs.proofOfWorkUrls || data.workSamples,
                 } as SkilledWorker;
             });
             setWorkers(workersData);
             setFilteredWorkers(workersData);
-        } catch (error) {
-            console.error("Error fetching data:", error);
-        } finally {
             setLoading(false);
-        }
-    };
+        }, (error) => {
+            console.error("Error listening to workers:", error);
+            setLoading(false);
+        });
 
-    useEffect(() => {
-        fetchWorkerData();
+        return () => unsubWorkers();
     }, []);
 
     useEffect(() => {
@@ -471,7 +491,9 @@ export default function SkilledWorkersPage() {
         }
     };
 
-
+    // Fix #2: PESO verification goes directly to verifier_admin
+    // If current user is verifier_admin, they get pending workers directly
+    // Fix #4 already handled via real-time listener above
 
     const exportToCSV = () => {
         const headers = ["Full Name", "Phone", "Type", "Service", "Location", "Rating", "Jobs", "Verified", "Status"];
@@ -523,8 +545,9 @@ export default function SkilledWorkersPage() {
                     </p>
                 </div>
                 <div className="flex items-center gap-3">
+                    {/* Fix #4: Real-time; Refresh reloads page to reinitialize listeners */}
                     <button
-                        onClick={fetchWorkerData}
+                        onClick={() => window.location.reload()}
                         className="flex items-center gap-2 px-5 py-2.5 bg-white border border-border rounded-xl text-sm font-semibold hover:bg-background transition-all shadow-sm active:scale-95"
                     >
                         <RefreshCw className={cn("w-4 h-4", loading && "animate-spin")} />
@@ -1198,6 +1221,47 @@ function WorkerDetailsModal({ worker, onClose, onStatusUpdate, adminNames }: { w
                                     </div>
                                 )}
                             </div>
+
+                            {/* Fix #3: PESO Scam Reporting */}
+                            {user?.role === 'verifier_admin' && (worker.status === 'verified' || worker.status === 'preliminary_verified') && (
+                                <button
+                                    onClick={async () => {
+                                        const reason = prompt(`Report "${worker.fullName}" as a scam/unreliable worker?\n\nPlease specify the reason for this report:`);
+                                        if (!reason) return;
+                                        try {
+                                            await addDoc(collection(db, "peso_reports"), {
+                                                workerId: worker.id,
+                                                workerName: worker.fullName,
+                                                workerPhone: worker.phoneNumber,
+                                                reason: reason,
+                                                reportedBy: user?.uid || 'verifier_admin',
+                                                reportedByName: 'PESO Admin',
+                                                status: 'pending_review',
+                                                createdAt: serverTimestamp(),
+                                            });
+                                            // Also notify Super Admin
+                                            await addDoc(collection(db, "admin_notifications"), {
+                                                title: "⚠️ Scam/Unreliable Worker Report",
+                                                message: `PESO Admin reported ${worker.fullName} as unreliable/scam. Reason: ${reason}`,
+                                                type: 'error',
+                                                targetRole: 'super_admin',
+                                                workerId: worker.id,
+                                                read: false,
+                                                createdAt: serverTimestamp(),
+                                            });
+                                            alert(`Report submitted successfully. Super Admin has been notified about ${worker.fullName}.`);
+                                        } catch (err) {
+                                            console.error('Report failed:', err);
+                                            alert('Failed to submit report. Please try again.');
+                                        }
+                                    }}
+                                    className="flex items-center gap-2 px-5 py-3 bg-orange-500/10 text-orange-600 border border-orange-500/30 rounded-2xl text-xs font-black uppercase tracking-wider hover:bg-orange-500 hover:text-white transition-all active:scale-95"
+                                >
+                                    <Flag className="w-4 h-4" />
+                                    Report Scam / Unreliable
+                                </button>
+                            )}
+
                             <button
                                 onClick={onClose}
                                 className="px-6 py-3 bg-background border border-border rounded-2xl text-sm font-bold text-text-light hover:bg-border/30 transition-all font-bold"

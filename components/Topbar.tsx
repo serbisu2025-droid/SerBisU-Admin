@@ -21,6 +21,9 @@ interface Notification {
     type: 'info' | 'success' | 'warning' | 'error';
     read: boolean;
     createdAt: any;
+    workerId?: string;
+    bookingId?: string;
+    ticketId?: string;
 }
 
 const Topbar = () => {
@@ -39,20 +42,29 @@ const Topbar = () => {
     useEffect(() => {
         if (!user) return;
 
-        // Fetch all notifications for admins (removed targetRole filter to include legacy docs)
+        // Fix #5: Fetch notifications, then filter by role client-side
+        // super_admin sees all, verifier_admin sees only their targeted ones
         const q = query(
             collection(db, "admin_notifications"),
             orderBy("createdAt", "desc"),
-            limit(notificationLimit + 1) // Fetch one extra to check for more
+            limit(notificationLimit + 50) // Fetch extra to account for role filtering
         );
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
-            const docs = snapshot.docs;
-            const more = docs.length > notificationLimit;
-            const data = (more ? docs.slice(0, notificationLimit) : docs).map(doc => ({
+            const allDocs = snapshot.docs.map(doc => ({
                 id: doc.id,
                 ...doc.data()
-            })) as Notification[];
+            })) as (Notification & { targetRole?: string })[];
+
+            // Fix #5: Filter by role - verifier_admin only sees their notifications
+            const roleFiltered = allDocs.filter(n => {
+                if (!n.targetRole || n.targetRole === 'all') return true; // No role = everyone sees
+                if (user.role === 'super_admin') return true; // Super admin sees everything
+                return n.targetRole === user.role; // PESO sees only their own
+            });
+
+            const more = roleFiltered.length > notificationLimit;
+            const data = more ? roleFiltered.slice(0, notificationLimit) : roleFiltered;
 
             setNotifications(data);
             setUnreadCount(data.filter(n => !n.read).length);
@@ -117,6 +129,27 @@ const Topbar = () => {
             await batch.commit();
         } catch (error) {
             console.error("Error marking all read:", error);
+        }
+    };
+
+    const handleNotificationClick = async (n: Notification) => {
+        // 1. Mark as read immediately
+        if (!n.read) markAsRead(n.id);
+        setShowNotifications(false);
+
+        // 2. Navigate based on type of data
+        if (n.workerId) {
+            router.push(`/skilled-workers?workerId=${n.workerId}`);
+        } else if (n.bookingId) {
+            router.push(`/bookings?bookingId=${n.bookingId}`);
+        } else if (n.ticketId) {
+            router.push(`/support?ticketId=${n.ticketId}`);
+        } else if (n.title.toLowerCase().includes("support")) {
+            router.push('/support');
+        } else if (n.title.toLowerCase().includes("worker") || n.title.toLowerCase().includes("registration")) {
+            router.push('/skilled-workers');
+        } else if (n.title.toLowerCase().includes("booking")) {
+            router.push('/bookings');
         }
     };
 
@@ -194,7 +227,7 @@ const Topbar = () => {
                                         {notifications.map((n) => (
                                             <div
                                                 key={n.id}
-                                                onClick={() => markAsRead(n.id)}
+                                                onClick={() => handleNotificationClick(n)}
                                                 className={`p-4 border-b border-border/30 hover:bg-background/50 transition-colors cursor-pointer group ${!n.read ? 'bg-primary/5' : ''}`}
                                             >
                                                 <div className="flex gap-3">
