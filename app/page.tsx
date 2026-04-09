@@ -127,10 +127,10 @@ export default function LoginPage() {
                             <div>
                                 <h4 className="text-[12px] font-bold text-primary uppercase tracking-wider mb-1">Official Security Notice</h4>
                                 <p className="text-[11px] leading-relaxed text-text-light font-medium">
-                                    <span className="font-bold text-primary">SerBisU – Admin Portal:</span> This is an official system developed to support community service matching and local employment facilitation in coordination with PESO.
+                                    <span className="font-bold text-primary">SerBisU - Admin Portal:</span> This is an official system developed to support community service matching and local employment facilitation in coordination with PESO.
                                 </p>
                                 <p className="text-[11px] leading-relaxed text-text-light font-medium mt-1">
-                                    The platform is intended for authorized administrators only. This system does not collect or process user credentials for any third-party services and is not associated with or imitating any external platforms.
+                                    The platform is intended for authorized administrators only. This system does not collect or process user credentials for any third-party services and is not associated with or imitating any external platforms..
                                 </p>
                             </div>
                         </div>
