@@ -1,0 +1,52 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary: #003B73;
+  --color-primary-light: #0074B7;
+  --color-secondary: #0074B7;
+  --color-accent: #00A8E8;
+  --color-text: #333333;
+  --color-text-light: #666666;
+  --color-background: #F5F7FA;
+  --color-success: #28C76F;
+  --color-error: #EA5455;
+  --color-border: #E0E0E0;
+
+  --font-sans: var(--font-poppins), ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+}
+
+@layer base {
+  body {
+    @apply bg-background text-text;
+  }
+}
+
+@layer components {
+
+  /* Custom styles from original project */
+  .sidebar {
+    @apply w-64 bg-primary text-white h-screen fixed left-0 top-0 flex flex-col;
+  }
+
+  .main-content {
+    @apply ml-64 min-h-screen;
+  }
+
+  .top-bar {
+    @apply h-16 bg-white shadow-sm flex items-center justify-between px-8 sticky top-0 z-50;
+  }
+
+  .card {
+    @apply bg-white rounded-xl shadow-md p-6 transition-all duration-300 hover:shadow-lg;
+  }
+
+  /* Hide scrollbar but keep functionality */
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}

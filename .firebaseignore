@@ -1,0 +1,10 @@
+.firebase/
+.next/
+node_modules/
+firebase.json
+.firebaserc
+.env.local
+.env
+next-env.d.ts
+tsbuildinfo
+*firebase-adminsdk*.json

@@ -1,0 +1,26 @@
+{
+  "hosting": {
+    "site": "serbisuadmin",
+    "source": ".",
+    "frameworksBackend": {
+      "region": "asia-southeast1",
+      "omit": ["devDependencies"]
+    },
+    "rewrites": [
+      {
+        "source": "**",
+        "run": {
+          "serviceId": "ssrserbisuadmin",
+          "region": "asia-southeast1"
+        }
+      }
+    ],
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**",
+      ".next/**",
+      "*firebase-adminsdk*.json"
+    ]
+  }
+}
