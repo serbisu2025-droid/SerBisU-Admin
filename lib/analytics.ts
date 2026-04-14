@@ -7,7 +7,9 @@ import {
     orderBy,
     limit,
     doc,
-    getDoc
+    getDoc,
+    QueryDocumentSnapshot,
+    DocumentData
 } from "firebase/firestore";
 import { db } from "./firebase";
 
@@ -74,7 +76,7 @@ async function fetchHomeownersAnalytics(startTimestamp: Timestamp, endTimestamp:
     const thisYear = new Date().getFullYear();
     let newUsers = 0;
 
-    allHomeownersSnapshot.docs.forEach(doc => {
+    allHomeownersSnapshot.docs.forEach((doc: QueryDocumentSnapshot<DocumentData>) => {
         const userData = doc.data();
 
         if (userData.isOnline === true) {
@@ -110,7 +112,7 @@ async function fetchHomeownersAnalytics(startTimestamp: Timestamp, endTimestamp:
         where('timestamp', '<=', endTimestamp)
     );
     const logsSnapshot = await getDocs(logsQuery);
-    logsSnapshot.docs.forEach(doc => {
+    logsSnapshot.docs.forEach((doc: QueryDocumentSnapshot<DocumentData>) => {
         const timestamp = doc.data().timestamp?.toDate?.();
         if (timestamp) {
             const dateStr = timestamp.toISOString().split('T')[0];
@@ -124,7 +126,7 @@ async function fetchHomeownersAnalytics(startTimestamp: Timestamp, endTimestamp:
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
     let activeLastMonth = 0;
-    allHomeownersSnapshot.docs.forEach(doc => {
+    allHomeownersSnapshot.docs.forEach((doc: QueryDocumentSnapshot<DocumentData>) => {
         const userData = doc.data();
         const lastSeen = userData.lastSeen?.toDate?.() || (userData.lastSeen ? new Date(userData.lastSeen) : null);
         const lastLogin = (userData.lastLoginAt || userData.lastLogin)?.toDate?.() || (userData.lastLoginAt || userData.lastLogin ? new Date(userData.lastLoginAt || userData.lastLogin) : null);
@@ -139,7 +141,7 @@ async function fetchHomeownersAnalytics(startTimestamp: Timestamp, endTimestamp:
     lastWeekStart.setDate(lastWeekStart.getDate() - 7);
 
     let previousWeekActive = 0;
-    allHomeownersSnapshot.docs.forEach(doc => {
+    allHomeownersSnapshot.docs.forEach((doc: QueryDocumentSnapshot<DocumentData>) => {
         const userData = doc.data();
         const lastLogin = (userData.lastLoginAt || userData.lastLogin)?.toDate?.() || (userData.lastLoginAt || userData.lastLogin ? new Date(userData.lastLoginAt || userData.lastLogin) : null);
         if (lastLogin && lastLogin >= previousWeekStart && lastLogin < lastWeekStart) {
@@ -169,7 +171,7 @@ async function fetchProvidersAnalytics(startTimestamp: Timestamp, endTimestamp: 
     let totalRating = 0;
     let ratedProviders = 0;
 
-    snapshot.docs.forEach(doc => {
+    snapshot.docs.forEach((doc: QueryDocumentSnapshot<DocumentData>) => {
         const data = doc.data();
         if (data.status === 'verified') verifiedCount++;
 
@@ -193,7 +195,7 @@ async function fetchProvidersAnalytics(startTimestamp: Timestamp, endTimestamp: 
 async function fetchBookingsAnalytics(startTimestamp: Timestamp, endTimestamp: Timestamp) {
     const snapshot = await getDocs(collection(db, 'bookings'));
 
-    const filteredDocs = snapshot.docs.filter(doc => {
+    const filteredDocs = snapshot.docs.filter((doc: QueryDocumentSnapshot<DocumentData>) => {
         const data = doc.data();
         let bookingDate = null;
 
@@ -234,7 +236,7 @@ async function fetchBookingsAnalytics(startTimestamp: Timestamp, endTimestamp: T
 
     const workersSnapshot = await getDocs(collection(db, 'skilled_workers'));
     const workerRatingsMap: Record<string, number> = {};
-    workersSnapshot.docs.forEach(doc => {
+    workersSnapshot.docs.forEach((doc: QueryDocumentSnapshot<DocumentData>) => {
         workerRatingsMap[doc.id] = doc.data().rating || 0;
     });
 
@@ -253,7 +255,7 @@ async function fetchBookingsAnalytics(startTimestamp: Timestamp, endTimestamp: T
         'House Cleaning': '#9C27B0', 'Cooking Services': '#FF5722', 'Appliance repair': '#607D8B'
     };
 
-    filteredDocs.forEach(doc => {
+    filteredDocs.forEach((doc: QueryDocumentSnapshot<DocumentData>) => {
         const data = doc.data();
         let status = data.status?.toLowerCase() || 'pending';
 
@@ -413,7 +415,7 @@ async function fetchServicesAnalytics(startTimestamp: Timestamp, endTimestamp: T
     const snapshot = await getDocs(collection(db, 'bookings'));
     const services: Record<string, { total: number, completed: number }> = {};
 
-    snapshot.docs.forEach(doc => {
+    snapshot.docs.forEach((doc: QueryDocumentSnapshot<DocumentData>) => {
         const data = doc.data();
         const type = data.jobType || data.serviceType;
         let bDate = null;

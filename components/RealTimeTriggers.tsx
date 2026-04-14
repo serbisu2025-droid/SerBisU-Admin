@@ -38,7 +38,9 @@ export default function RealTimeTriggers() {
             }
         };
 
+        // All triggers moved to Cloud Functions for reliability
         // 1. Listen for New Support Requests (real-time)
+        /*
         const supportQuery = query(
             collection(db, "support_requests"),
             where("createdAt", ">", startTime.current)
@@ -59,10 +61,10 @@ export default function RealTimeTriggers() {
                 }
             });
         });
+        */
 
         // 2. Real-time listener for New Worker Registrations
-        // Fix #4: Uses onSnapshot so new workers appear instantly without refresh
-        // Fix #5: Creates notifications for BOTH admin and PESO
+        /*
         const workerQuery = query(
             collection(db, "skilled_workers"),
             where("createdAt", ">", startTime.current)
@@ -97,8 +99,10 @@ export default function RealTimeTriggers() {
                 }
             });
         });
+        */
 
         // 3. Listen for New Bookings (real-time)
+        /*
         const bookingQuery = query(
             collection(db, "bookings"),
             where("createdAt", ">", startTime.current)
@@ -122,11 +126,12 @@ export default function RealTimeTriggers() {
                 }
             });
         });
+        */
 
         return () => {
-            unsubSupport();
-            unsubWorkers();
-            unsubBookings();
+            // unsubSupport();
+            // unsubWorkers();
+            // unsubBookings();
         };
     }, []);
 

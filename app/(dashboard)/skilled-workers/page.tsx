@@ -285,8 +285,8 @@ function SkilledWorkersContent() {
 
             // Role-based initial filter (Two-Step Verification)
             if (user?.role === 'verifier_admin') {
-                // PESO Admins see Tier 2 (Preliminary Verified), Final Verified, and Rejected workers
-                result = result.filter(w => w.status === 'preliminary_verified' || w.status === 'verified' || w.status === 'rejected');
+                // PESO Admins see Pending, Tier 2, Final Verified, and Rejected workers
+                result = result.filter(w => w.status === 'pending' || !w.status || w.status === 'preliminary_verified' || w.status === 'verified' || w.status === 'rejected');
             } else if (user?.role === 'super_admin') {
                 // Super Admin sees ALL workers by default
             }
@@ -392,62 +392,30 @@ function SkilledWorkersContent() {
                 const currentStatus = worker.status || 'pending';
 
                 if (user.role === 'super_admin') {
-                    // Super admin can do preliminary verification
-                    if (currentStatus === 'pending') {
-                        update.status = 'preliminary_verified';
-                        update.preliminaryVerifiedBy = user.uid;
-                        update.preliminaryVerifiedAt = serverTimestamp();
-                        update.isVerified = false;
-
-                        await updateDoc(doc(db, "skilled_workers", worker.id), update);
-
-                        // NOTIFY VERIFIER ADMIN
-                        await createAdminNotification({
-                            title: "New Verification Task",
-                            message: `${worker.fullName} has been cleared for final review. Please proceed with PESO verification.`,
-                            type: "info",
-                            targetRole: "verifier_admin"
-                        });
-
-                        const msg = `Hi ${worker.fullName}, your SerBisU provider application has passed initial verification. It is now waiting for PESO verification for final approval.`;
-                        await sendSms(worker.phoneNumber || "", msg);
-
-                        setWorkers(prev => prev.map(w => w.id === worker.id ? { ...w, ...update } : w));
-                        alert("Worker moved to Waiting for PESO Verification stage.");
-                        return;
-                    } else if (currentStatus === 'preliminary_verified') {
-                        // Super admin can also do final verification
-                        update.status = 'verified';
-                        update.finalVerifiedBy = user.uid;
-                        update.finalVerifiedAt = serverTimestamp();
-                        update.isVerified = true;
-                        update.rejectionReason = null;
-                    }
+                    // Super Admin can do full verification or preliminary review
+                    update.status = 'verified';
+                    update.finalVerifiedBy = user.uid;
+                    update.finalVerifiedAt = serverTimestamp();
+                    update.isVerified = true;
+                    update.rejectionReason = null;
                 } else if (user.role === 'verifier_admin') {
-                    // Verifier admin can only do final verification on preliminary_verified workers
-                    if (currentStatus === 'preliminary_verified') {
-                        update.status = 'verified';
-                        update.finalVerifiedBy = user.uid;
-                        update.finalVerifiedAt = serverTimestamp();
-                        update.isVerified = true;
-                        update.rejectionReason = null;
-                    } else {
-                        alert("PESO Verifiers can only verify workers that are waiting for PESO verification.");
-                        return;
-                    }
+                    // Verifier admin (PESO) can also do direct final verification
+                    update.status = 'verified';
+                    update.finalVerifiedBy = user.uid;
+                    update.finalVerifiedAt = serverTimestamp();
+                    update.isVerified = true;
+                    update.rejectionReason = null;
                 }
 
                 await updateDoc(doc(db, "skilled_workers", worker.id), update);
 
-                // NOTIFY SUPER ADMIN IF VERIFIER ADMIN DOES THE FINAL APPROVAL
-                if (user.role === 'verifier_admin') {
-                    await createAdminNotification({
-                        title: "Final Approval Completed",
-                        message: `${worker.fullName} has been fully verified by PESO Verifier.`,
-                        type: "success",
-                        targetRole: "super_admin"
-                    });
-                }
+                // NOTIFY OTHER ADMIN ROLES ABOUT APPROVAL
+                await createAdminNotification({
+                    title: "Worker Verified",
+                    message: `${worker.fullName} has been fully verified by ${user.role.replace('_', ' ')}.`,
+                    type: "success",
+                    targetRole: user.role === 'super_admin' ? 'verifier_admin' : 'super_admin'
+                });
 
                 const msg = `Hi ${worker.fullName}, your SerBisU provider account has been fully verified. You can now receive jobs.`;
                 await sendSms(worker.phoneNumber || "", msg);
@@ -540,8 +508,8 @@ function SkilledWorkersContent() {
                     </h1>
                     <p className="text-text-light font-semibold uppercase tracking-widest text-[10px] mt-1">
                         {user?.role === 'super_admin'
-                            ? 'Manage all skilled workers and handle initial approvals'
-                            : 'Final review for skilled workers cleared by Super Admin'}
+                            ? 'Manage all skilled workers and handle direct approvals'
+                            : 'Direct review and verification for skilled worker applications'}
                     </p>
                 </div>
                 <div className="flex items-center gap-3">
@@ -784,35 +752,30 @@ function SkilledWorkersContent() {
                                                 </div>
                                             </td>
                                             <td className="px-8 py-6">
-                                                <div className="flex flex-col gap-2">
+                                                {worker.status !== 'verified' && worker.status !== 'rejected' ? (
                                                     <select
                                                         value={worker.status || 'pending'}
                                                         onChange={(e) => handleUpdateStatus(worker, e.target.value)}
-                                                        disabled={worker.status === 'verified' || worker.status === 'rejected' || (worker.status === 'preliminary_verified' && user?.role === 'super_admin')}
                                                         className={cn(
                                                             "text-[10px] font-black uppercase px-3 py-1.5 rounded-full border-2 transition-all cursor-pointer focus:outline-none appearance-none text-center min-w-[140px]",
-                                                            (worker.status === 'verified' || worker.status === 'rejected') && "opacity-50 cursor-not-allowed",
-                                                            worker.status === 'verified'
-                                                                ? "bg-success/10 text-success border-success/30 hover:bg-success/20"
-                                                                : worker.status === 'preliminary_verified'
-                                                                    ? "bg-blue-500/10 text-blue-500 border-blue-500/30 hover:bg-blue-500/20"
-                                                                    : worker.status === 'rejected'
-                                                                        ? "bg-error/10 text-error border-error/30 hover:bg-error/20"
-                                                                        : "bg-orange-500/10 text-orange-500 border-orange-500/30 hover:bg-orange-500/20"
+                                                            worker.status === 'preliminary_verified'
+                                                                ? "bg-blue-500/10 text-blue-500 border-blue-500/30 hover:bg-blue-500/20"
+                                                                : "bg-orange-500/10 text-orange-500 border-orange-500/30 hover:bg-orange-500/20"
                                                         )}
                                                     >
-                                                        <option value="verified">✓ Verified</option>
+                                                        <option value="pending">⊙ Pending Review</option>
                                                         <option value="preliminary_verified">⊙ Waiting for PESO</option>
-                                                        <option value="pending">⏳ Pending</option>
-                                                        <option value="rejected">✗ Rejected (Waiting for Resubmission)</option>
+                                                        <option value="verified">⊙ Fully Verified</option>
+                                                        <option value="rejected">⊙ Rejected</option>
                                                     </select>
-                                                    {worker.status === 'preliminary_verified' && (
-                                                        <span className="text-[8px] text-blue-600 font-bold flex items-center gap-1">
-                                                            <AlertCircle className="w-2.5 h-2.5" />
-                                                            Waiting for PESO Verification
-                                                        </span>
-                                                    )}
-                                                </div>
+                                                ) : (
+                                                    <span className={cn(
+                                                        "text-[10px] font-black uppercase px-3 py-1.5 rounded-full border-2",
+                                                        worker.status === 'verified' ? "bg-success/10 text-success border-success/30" : "bg-error/10 text-error border-error/30"
+                                                    )}>
+                                                        {worker.status === 'verified' ? 'Fully Verified' : 'Rejected'}
+                                                    </span>
+                                                )}
                                             </td>
                                             <td className="px-8 py-6 text-right">
                                                 <div className="flex items-center justify-end gap-6">
@@ -1169,7 +1132,7 @@ function WorkerDetailsModal({ worker, onClose, onStatusUpdate, adminNames }: { w
                                     )}
                                     {worker.finalVerifiedBy && (
                                         <div className="bg-white p-4 rounded-xl">
-                                            <p className="text-[9px] font-black text-text-light/60 uppercase mb-1">PESO Verification (Final)</p>
+                                            <p className="text-[9px] font-black text-text-light/60 uppercase mb-1">Verification Status</p>
                                             <p className="text-sm font-bold text-text">Verify by: {adminNames[worker.finalVerifiedBy] || `ID: ${worker.finalVerifiedBy.slice(-6)}`}</p>
                                             {worker.finalVerifiedAt && (
                                                 <p className="text-xs text-text-light mt-1">
@@ -1203,8 +1166,8 @@ function WorkerDetailsModal({ worker, onClose, onStatusUpdate, adminNames }: { w
                                             disabled={isProcessing}
                                             className="flex items-center gap-2 px-6 py-3 bg-success text-white rounded-2xl text-sm font-black uppercase tracking-wider hover:scale-105 transition-all shadow-lg shadow-success/20 active:scale-95 disabled:opacity-50 disabled:scale-100 disabled:cursor-not-allowed min-w-[200px] justify-center"
                                         >
-                                            {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-                                            {worker.status === 'pending' ? 'Move to PESO Review' : 'Final Approve (PESO)'}
+                                            {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                                            Approve and Verify Application
                                         </button>
                                         <button
                                             onClick={() => handleAction('rejected')}
