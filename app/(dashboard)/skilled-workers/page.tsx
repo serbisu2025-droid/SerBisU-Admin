@@ -89,6 +89,7 @@ interface SkilledWorker {
     phoneNumber?: string;
     experience?: string;
     address?: string;
+    employmentStatus?: string;
     personalInfo?: {
         fullName?: string;
         email?: string;
@@ -96,6 +97,7 @@ interface SkilledWorker {
         mobileNumber?: string;
         age?: number | string;
         address?: string;
+        employmentStatus?: string;
     };
     serviceInfo?: {
         serviceType?: string;
@@ -253,6 +255,7 @@ function SkilledWorkersContent() {
                     location: data.personalInfo?.address || data.location?.address || data.address || 'Unknown',
                     age: data.personalInfo?.age || data.age || 'N/A',
                     gender: data.personalInfo?.gender || data.gender || 'N/A',
+                    employmentStatus: data.personalInfo?.employmentStatus || data.employmentStatus || 'N/A',
                     experience: data.serviceInfo?.experience || data.experience || 'N/A',
                     address: data.personalInfo?.address || data.location?.address || data.address || 'Unknown',
                     idFrontPath: data.idFrontPath || docs.idFrontPath || docs.idFront || data.idFront || data.id_front || docs.id_front || docs.idFrontImage || data.idFrontImage,
@@ -741,6 +744,17 @@ function SkilledWorkersContent() {
                                                         </div>
                                                         <span className="text-xs font-medium text-text-light">{worker.age} Years Old • {worker.gender}</span>
                                                     </div>
+                                                    <div className="flex items-center gap-2 mt-1">
+                                                        <div className={cn(
+                                                            "text-[9px] font-black uppercase px-2 py-0.5 rounded-full",
+                                                            worker.employmentStatus === 'Employed' ? "bg-success/10 text-success" :
+                                                            worker.employmentStatus === 'Underemployed' ? "bg-orange-500/10 text-orange-500" :
+                                                            worker.employmentStatus === 'Unemployed' ? "bg-error/10 text-error" :
+                                                            "bg-text-light/10 text-text-light"
+                                                        )}>
+                                                            {worker.employmentStatus || 'N/A'}
+                                                        </div>
+                                                    </div>
                                                 </div>
                                             </td>
                                             <td className="px-8 py-6">
@@ -939,6 +953,17 @@ function WorkerDetailsModal({ worker, onClose, onStatusUpdate, adminNames }: { w
                                 <DetailItem icon={<Phone className="w-4 h-4" />} label="Phone Number" value={worker.phoneNumber} />
                                 <DetailItem icon={<Calendar className="w-4 h-4" />} label="Age / Gender" value={`${worker.age} Years Old / ${worker.gender}`} />
                                 <DetailItem icon={<MapPin className="w-4 h-4" />} label="Main Location" value={worker.location} />
+                                <DetailItem icon={<Briefcase className="w-4 h-4" />} label="Employment Status" value={
+                                    <span className={cn(
+                                        "text-xs font-black uppercase px-3 py-1 rounded-full",
+                                        worker.employmentStatus === 'Employed' ? "bg-success/10 text-success" :
+                                        worker.employmentStatus === 'Underemployed' ? "bg-orange-500/10 text-orange-500" :
+                                        worker.employmentStatus === 'Unemployed' ? "bg-error/10 text-error" :
+                                        "bg-text-light/10 text-text-light"
+                                    )}>
+                                        {worker.employmentStatus || 'Not Specified'}
+                                    </span>
+                                } />
                             </div>
 
                             <div className="flex items-center gap-10 px-6 py-4 bg-primary text-white rounded-3xl shadow-lg">

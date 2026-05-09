@@ -52,6 +52,7 @@ interface SkilledWorker {
     address: string;
     serviceType: string;
     experience: string;
+    employmentStatus: string;
     activityStatus: "active" | "inactive" | "offline";
     gender?: string;
     profileImage?: string;
@@ -76,6 +77,7 @@ export default function ViewWorkersPage() {
     const [selectedService, setSelectedService] = useState("All Services");
     const [selectedAge, setSelectedAge] = useState("All Ages");
     const [selectedGender, setSelectedGender] = useState("All Genders");
+    const [selectedEmployment, setSelectedEmployment] = useState("All Status");
     const [selectedWorker, setSelectedWorker] = useState<SkilledWorker | null>(null);
     const [reviews, setReviews] = useState<any[]>([]);
     const [reviewsLoading, setReviewsLoading] = useState(false);
@@ -99,6 +101,11 @@ export default function ViewWorkersPage() {
     const uniqueGenders = useMemo(() => {
         const genders = Array.from(new Set(workers.map(w => w.gender).filter(g => g && g !== 'N/A')));
         return ["All Genders", ...genders.sort()];
+    }, [workers]);
+
+    const uniqueEmploymentStatuses = useMemo(() => {
+        const statuses = Array.from(new Set(workers.map(w => w.employmentStatus).filter(s => s && s !== 'N/A')));
+        return ["All Status", ...statuses.sort()];
     }, [workers]);
 
     const fetchWorkerData = async () => {
@@ -163,6 +170,7 @@ export default function ViewWorkersPage() {
                         phoneNumber: data.personalInfo?.mobileNumber || data.personalInfo?.phoneNumber || data.phone || data.phoneNumber || 'N/A',
                         age: data.personalInfo?.age || data.age || 'N/A',
                         gender: data.personalInfo?.gender || data.gender || 'N/A',
+                        employmentStatus: data.personalInfo?.employmentStatus || data.employmentStatus || 'N/A',
                         address: data.personalInfo?.address || data.location?.address || data.address || 'Unknown',
                         serviceType: data.serviceInfo?.serviceType || data.serviceType || 'General',
                         experience: data.serviceInfo?.experience || data.experience || 'N/A',
@@ -200,11 +208,12 @@ export default function ViewWorkersPage() {
             const matchesService = selectedService === "All Services" || w.serviceType === selectedService;
             const matchesAge = selectedAge === "All Ages" || w.age?.toString() === selectedAge;
             const matchesGender = selectedGender === "All Genders" || w.gender === selectedGender;
+            const matchesEmployment = selectedEmployment === "All Status" || w.employmentStatus === selectedEmployment;
             
-            return matchesSearch && matchesAddress && matchesService && matchesAge && matchesGender;
+            return matchesSearch && matchesAddress && matchesService && matchesAge && matchesGender && matchesEmployment;
         });
         setFilteredWorkers(result);
-    }, [searchTerm, selectedAddress, selectedService, selectedAge, selectedGender, workers]);
+    }, [searchTerm, selectedAddress, selectedService, selectedAge, selectedGender, selectedEmployment, workers]);
 
     const fetchReviews = async (worker: SkilledWorker) => {
         setSelectedWorker(worker);
@@ -315,6 +324,21 @@ export default function ViewWorkersPage() {
                             >
                                 {uniqueGenders.map(gender => (
                                     <option key={gender} value={gender}>{gender}</option>
+                                ))}
+                            </select>
+                            <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-text-light pointer-events-none transition-transform group-focus-within:rotate-180" />
+                        </div>
+
+                        {/* Employment Status Filter */}
+                        <div className="relative group">
+                            <Briefcase className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-text-light group-focus-within:text-primary transition-colors z-10" />
+                            <select
+                                value={selectedEmployment}
+                                onChange={(e) => setSelectedEmployment(e.target.value)}
+                                className="pl-10 pr-10 py-4 bg-background border-2 border-transparent rounded-2xl w-full md:w-[160px] focus:outline-none focus:border-primary/20 focus:bg-white transition-all font-bold text-[11px] uppercase tracking-wider shadow-inner appearance-none cursor-pointer relative z-0"
+                            >
+                                {uniqueEmploymentStatuses.map(status => (
+                                    <option key={status} value={status}>{status}</option>
                                 ))}
                             </select>
                             <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-text-light pointer-events-none transition-transform group-focus-within:rotate-180" />
@@ -447,6 +471,17 @@ export default function ViewWorkersPage() {
                                                             <Calendar className="w-3 h-3 text-blue-500" />
                                                         </div>
                                                         <span className="text-[10px] font-bold text-text-light">{worker.age} Years Old • {worker.gender}</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-2 mt-1">
+                                                        <div className={cn(
+                                                            "text-[9px] font-black uppercase px-2 py-0.5 rounded-full",
+                                                            worker.employmentStatus === 'Employed' ? "bg-success/10 text-success" :
+                                                            worker.employmentStatus === 'Underemployed' ? "bg-orange-500/10 text-orange-500" :
+                                                            worker.employmentStatus === 'Unemployed' ? "bg-error/10 text-error" :
+                                                            "bg-text-light/10 text-text-light"
+                                                        )}>
+                                                            {worker.employmentStatus || 'N/A'}
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </td>

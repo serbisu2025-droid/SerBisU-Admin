@@ -170,6 +170,11 @@ async function fetchProvidersAnalytics(startTimestamp: Timestamp, endTimestamp: 
     const serviceTypes: Record<string, number> = {};
     let totalRating = 0;
     let ratedProviders = 0;
+    const employmentStatusCounts: Record<string, number> = {
+        'Employed': 0,
+        'Unemployed': 0,
+        'Underemployed': 0
+    };
 
     snapshot.docs.forEach((doc: QueryDocumentSnapshot<DocumentData>) => {
         const data = doc.data();
@@ -182,13 +187,19 @@ async function fetchProvidersAnalytics(startTimestamp: Timestamp, endTimestamp: 
             totalRating += data.rating;
             ratedProviders++;
         }
+
+        const empStatus = data.personalInfo?.employmentStatus || data.employmentStatus;
+        if (empStatus && employmentStatusCounts[empStatus] !== undefined) {
+            employmentStatusCounts[empStatus]++;
+        }
     });
 
     return {
         totalCount,
         verifiedCount,
         averageRating: ratedProviders > 0 ? totalRating / ratedProviders : 0,
-        serviceTypes
+        serviceTypes,
+        employmentStatusCounts
     };
 }
 
