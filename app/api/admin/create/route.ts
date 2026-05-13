@@ -6,11 +6,18 @@ import { getFirestore } from 'firebase-admin/firestore';
 // Helper to get Firebase Admin services
 function getAdminServices() {
     if (!getApps().length) {
+        // Robustly parse the private key: handle escaped newlines, stray quotes, etc.
+        let privateKey = process.env.FBASE_PRIVATE_KEY || '';
+        // Strip surrounding quotes if present
+        privateKey = privateKey.replace(/^["']|["']$/g, '');
+        // Replace literal \n with real newlines
+        privateKey = privateKey.replace(/\\n/g, '\n');
+
         initializeApp({
             credential: cert({
                 projectId: process.env.FBASE_PROJECT_ID,
                 clientEmail: process.env.FBASE_CLIENT_EMAIL,
-                privateKey: process.env.FBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+                privateKey,
             }),
         });
     }
