@@ -116,7 +116,7 @@ interface SkilledWorker {
     jobsCompleted?: number;
     orders?: number;
     isVerified?: boolean;
-    status?: string; // 'pending' | 'preliminary_verified' | 'verified' | 'rejected'
+    status?: string; // 'pending' | 'preliminary_verified' | 'verified' | 'rejected' | 'resubmission'
     location?: any;
     lastSeen?: any;
     isOnline?: boolean;
@@ -289,7 +289,7 @@ function SkilledWorkersContent() {
             // Role-based initial filter (Two-Step Verification)
             if (user?.role === 'verifier_admin') {
                 // PESO Admins see Pending, Tier 2, Final Verified, and Rejected workers
-                result = result.filter(w => w.status === 'pending' || !w.status || w.status === 'preliminary_verified' || w.status === 'verified' || w.status === 'rejected');
+                result = result.filter(w => w.status === 'pending' || !w.status || w.status === 'preliminary_verified' || w.status === 'verified' || w.status === 'rejected' || w.status === 'resubmission');
             } else if (user?.role === 'super_admin') {
                 // Super Admin sees ALL workers by default
             }
@@ -326,6 +326,7 @@ function SkilledWorkersContent() {
                 if (filters.status === "verified") result = result.filter(w => w.status === 'verified');
                 else if (filters.status === "preliminary_verified") result = result.filter(w => w.status === 'preliminary_verified');
                 else if (filters.status === "pending") result = result.filter(w => w.status === 'pending' || !w.status);
+                else if (filters.status === "resubmission") result = result.filter(w => w.status === 'resubmission');
                 else result = result.filter(w => w.status === filters.status);
             }
 
@@ -370,6 +371,11 @@ function SkilledWorkersContent() {
         if (newStatus === "rejected") {
             reason = prompt("Please provide a reason for rejection:") || "";
             if (!reason) return;
+        }
+
+        if (newStatus === "resubmission") {
+            const confirmed = confirm(`Mark ${worker.fullName} as Resubmission? This will move them back into the review queue.`);
+            if (!confirmed) return;
         }
 
         const createAdminNotification = async (notification: any) => {
@@ -447,6 +453,28 @@ function SkilledWorkersContent() {
 
                 setWorkers(prev => prev.map(w => w.id === worker.id ? { ...w, ...update, isVerified: false } : w));
                 alert("Worker rejected.");
+            } else if (newStatus === 'resubmission') {
+                update.status = 'resubmission';
+                update.isVerified = false;
+                update.resubmittedAt = serverTimestamp();
+                update.resubmittedBy = user.uid;
+                update.rejectionReason = null;
+
+                await updateDoc(doc(db, "skilled_workers", worker.id), update);
+
+                // Notify other admins about resubmission
+                await createAdminNotification({
+                    title: "Worker Resubmission",
+                    message: `${worker.fullName} has been marked for resubmission by ${user.role.replace('_', ' ')}. Documents need re-review.`,
+                    type: "info",
+                    targetRole: user.role === 'super_admin' ? 'verifier_admin' : 'super_admin'
+                });
+
+                const msg = `Hi ${worker.fullName}, your SerBisU provider application has been reopened for review. Please ensure your documents are updated.`;
+                await sendSms(worker.phoneNumber || "", msg);
+
+                setWorkers(prev => prev.map(w => w.id === worker.id ? { ...w, ...update, isVerified: false } : w));
+                alert("Worker marked as Resubmission. They are back in the review queue.");
             } else {
                 // Handle other status changes
                 update.status = newStatus;
@@ -621,6 +649,7 @@ function SkilledWorkersContent() {
                             <option value="verified">Verified</option>
                             <option value="preliminary_verified">Waiting for PESO</option>
                             <option value="pending">Pending</option>
+                            <option value="resubmission">Resubmission</option>
                             <option value="rejected">Rejected</option>
                         </select>
                     </div>
@@ -774,20 +803,36 @@ function SkilledWorkersContent() {
                                                             "text-[10px] font-black uppercase px-3 py-1.5 rounded-full border-2 transition-all cursor-pointer focus:outline-none appearance-none text-center min-w-[140px]",
                                                             worker.status === 'preliminary_verified'
                                                                 ? "bg-blue-500/10 text-blue-500 border-blue-500/30 hover:bg-blue-500/20"
-                                                                : "bg-orange-500/10 text-orange-500 border-orange-500/30 hover:bg-orange-500/20"
+                                                                : worker.status === 'resubmission'
+                                                                    ? "bg-amber-500/10 text-amber-600 border-amber-500/30 hover:bg-amber-500/20"
+                                                                    : "bg-orange-500/10 text-orange-500 border-orange-500/30 hover:bg-orange-500/20"
                                                         )}
                                                     >
                                                         <option value="pending">⊙ Pending Review</option>
                                                         <option value="preliminary_verified">⊙ Waiting for PESO</option>
                                                         <option value="verified">⊙ Fully Verified</option>
+                                                        <option value="resubmission">⊙ Resubmission</option>
                                                         <option value="rejected">⊙ Rejected</option>
                                                     </select>
+                                                ) : worker.status === 'rejected' ? (
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-[10px] font-black uppercase px-3 py-1.5 rounded-full border-2 bg-error/10 text-error border-error/30">
+                                                            Rejected
+                                                        </span>
+                                                        <button
+                                                            onClick={() => handleUpdateStatus(worker, 'resubmission')}
+                                                            title="Move to Resubmission"
+                                                            className="text-[9px] font-black uppercase px-2 py-1 rounded-full border-2 bg-amber-500/10 text-amber-600 border-amber-500/30 hover:bg-amber-500 hover:text-white transition-all cursor-pointer"
+                                                        >
+                                                            ↻ Resubmit
+                                                        </button>
+                                                    </div>
                                                 ) : (
                                                     <span className={cn(
                                                         "text-[10px] font-black uppercase px-3 py-1.5 rounded-full border-2",
-                                                        worker.status === 'verified' ? "bg-success/10 text-success border-success/30" : "bg-error/10 text-error border-error/30"
+                                                        "bg-success/10 text-success border-success/30"
                                                     )}>
-                                                        {worker.status === 'verified' ? 'Fully Verified' : 'Rejected'}
+                                                        Fully Verified
                                                     </span>
                                                 )}
                                             </td>
@@ -942,7 +987,7 @@ function WorkerDetailsModal({ worker, onClose, onStatusUpdate, adminNames }: { w
                                     "text-[10px] font-black uppercase px-3 py-1 rounded-full",
                                     worker.isVerified ? "bg-success/10 text-success" : "bg-orange-500/10 text-orange-500"
                                 )}>
-                                    {worker.status === 'rejected' ? 'Rejected (Waiting for Resubmission)' : worker.status}
+                                    {worker.status === 'rejected' ? 'Rejected' : worker.status === 'resubmission' ? 'Resubmission (Under Re-review)' : worker.status}
                                 </span>
                             </div>
                         </div>
@@ -1203,9 +1248,23 @@ function WorkerDetailsModal({ worker, onClose, onStatusUpdate, adminNames }: { w
                                             Reject
                                         </button>
                                     </>
+                                ) : worker.status === 'rejected' ? (
+                                    <div className="flex items-center gap-3">
+                                        <div className="px-6 py-3 bg-error/10 text-error border-error/30 rounded-2xl text-xs font-black uppercase tracking-widest border flex items-center gap-2">
+                                            <XCircle className="w-4 h-4" /> Application Rejected
+                                        </div>
+                                        <button
+                                            onClick={() => handleAction('resubmission')}
+                                            disabled={isProcessing}
+                                            className="flex items-center gap-2 px-6 py-3 bg-amber-500 text-white rounded-2xl text-sm font-black uppercase tracking-wider hover:scale-105 transition-all shadow-lg shadow-amber-500/20 active:scale-95 disabled:opacity-50 disabled:scale-100 disabled:cursor-not-allowed"
+                                        >
+                                            {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                                            Mark as Resubmission
+                                        </button>
+                                    </div>
                                 ) : (
-                                    <div className={`px-6 py-3 ${worker.status === 'verified' ? 'bg-success/10 text-success border-success/30' : 'bg-error/10 text-error border-error/30'} rounded-2xl text-xs font-black uppercase tracking-widest border flex items-center gap-2`}>
-                                        <ShieldCheck className="w-4 h-4" /> {worker.status === 'verified' ? 'Fully PESO Verified' : 'Application Rejected'}
+                                    <div className="px-6 py-3 bg-success/10 text-success border-success/30 rounded-2xl text-xs font-black uppercase tracking-widest border flex items-center gap-2">
+                                        <ShieldCheck className="w-4 h-4" /> Fully PESO Verified
                                     </div>
                                 )}
                             </div>
